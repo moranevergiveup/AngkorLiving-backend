@@ -33,17 +33,21 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public RoomResponse createRoom(RoomRequest request, MultipartFile imageFile) throws IOException {
+
         Floor floor = floorRepository.findById(request.getFloorId())
                 .orElseThrow(() -> new EntityNotFoundException("Floor not found"));
 
+        Integer nextRoomNumber = generateNextRoomNumber(request.getFloorId());
+
         String imageUrl = null;
         if (imageFile != null && !imageFile.isEmpty()) {
-            Map uploadResult = cloudinary.uploader().upload(imageFile.getBytes(), ObjectUtils.emptyMap());
+            Map uploadResult = cloudinary.uploader()
+                    .upload(imageFile.getBytes(), ObjectUtils.emptyMap());
             imageUrl = (String) uploadResult.get("url");
         }
 
         Room room = Room.builder()
-                .roomNumber(request.getRoomNumber())
+                .roomNumber(nextRoomNumber.toString())
                 .floor(floor)
                 .status(request.getStatus())
                 .imageUrl(imageUrl)
@@ -53,6 +57,15 @@ public class RoomServiceImpl implements RoomService {
         return toResponse(saved);
     }
 
+    public Integer generateNextRoomNumber(Long floorId) {
+        Integer maxRoom = roomRepository.findMaxRoomNumberByFloorId(floorId);
+
+        if (maxRoom == null) {
+            return (int) (floorId * 100 + 1); // 1 → 101
+        }
+
+        return maxRoom + 1;
+    }
     @Override
     public RoomResponse getRoom(Long id) {
         Room room = roomRepository.findById(id)
@@ -73,9 +86,9 @@ public class RoomServiceImpl implements RoomService {
         Room room = roomRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Room not found with id: " + id));
 
-        if (request.getRoomNumber() != null) {
-            room.setRoomNumber(request.getRoomNumber());
-        }
+//        if (request.getRoomNumber() != null) {
+//            room.setRoomNumber(request.getRoomNumber());
+//        }
         if (request.getStatus() != null) {
             room.setStatus(request.getStatus());
         }
