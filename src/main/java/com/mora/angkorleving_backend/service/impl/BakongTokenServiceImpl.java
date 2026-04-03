@@ -278,12 +278,12 @@ public class BakongTokenServiceImpl implements BakongTokenService {
     @Value("${BAKONG.BASE-URL}")
     private String baseUrl;
 
-    @Value("${BAKONG_ACCOUNT-ID}")
-    private String bakongAccountId;
+//    @Value("${BAKONG_ACCOUNT_USERNAME}")
+//    private String bakongAccountId;
 
 //    @Value("${bakong.base-url}")
 //    private String baseUrl;
-    @Value("${bakong.email}")
+    @Value("${BAKONG_EMAIL}")
     private String email;
 
     private String cachedToken;
