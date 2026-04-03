@@ -1,6 +1,7 @@
 package com.mora.angkorleving_backend.controller;
 
 import com.mora.angkorleving_backend.DTOs.request.UserUpdateRequest;
+import com.mora.angkorleving_backend.DTOs.response.UserProfileResponse;
 import com.mora.angkorleving_backend.DTOs.response.UserRespone;
 import com.mora.angkorleving_backend.model.User;
 import com.mora.angkorleving_backend.service.UserService;
@@ -47,7 +48,7 @@ public class UserController {
 
     // TENANT/USER endpoints
     @GetMapping("/profile")
-    public User getProfile(@AuthenticationPrincipal UserDetails userDetails) {
+    public UserProfileResponse getProfile(@AuthenticationPrincipal UserDetails userDetails) {
         return userService.getProfile(userDetails.getUsername());
     }
 

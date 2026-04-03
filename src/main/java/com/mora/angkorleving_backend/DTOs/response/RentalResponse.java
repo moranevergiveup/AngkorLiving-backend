@@ -16,5 +16,9 @@ public class RentalResponse {
     private LocalDate endDate;
     private String status;
     private Double monthlyRent;
+
+    public RentalResponse() {
+
+    }
 }
 

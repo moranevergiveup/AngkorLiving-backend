@@ -3,8 +3,12 @@ package com.mora.angkorleving_backend.service.impl;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import com.mora.angkorleving_backend.DTOs.request.UserUpdateRequest;
+import com.mora.angkorleving_backend.DTOs.response.RentalResponse;
+import com.mora.angkorleving_backend.DTOs.response.UserProfileResponse;
 import com.mora.angkorleving_backend.DTOs.response.UserRespone;
+import com.mora.angkorleving_backend.Repository.RentalRepository;
 import com.mora.angkorleving_backend.Repository.UserRepository;
+import com.mora.angkorleving_backend.model.Rental;
 import com.mora.angkorleving_backend.model.Role;
 import com.mora.angkorleving_backend.model.User;
 import com.mora.angkorleving_backend.service.UserService;
@@ -26,6 +30,8 @@ public class UserServiceImpl implements UserService {
 
     @Autowired
     private UserRepository userRepository;
+    @Autowired
+    private RentalRepository rentalRepository;
 
     @Autowired
     private PasswordEncoder passwordEncoder;
@@ -33,19 +39,6 @@ public class UserServiceImpl implements UserService {
     private  Cloudinary cloudinary;
 
     @Override
-//    public List<UserRespone> getAllUsers() {
-//        return userRepository.findAll()
-//                .stream()
-//                .map(u -> new UserRespone(
-//                        u.getId(),
-//                        u.getUsername(),
-//                        u.getEmail(),
-//                        u.getRole().name(),
-//                        u.getPhone(),
-//                        u.getProfileImage()
-//                ))
-//                .toList();
-//    }
     public List<UserRespone> getAllUsers() {
         return userRepository.findAll(Sort.by(Sort.Direction.ASC, "id"))
                 .stream()
@@ -81,13 +74,6 @@ public class UserServiceImpl implements UserService {
         if (request.getProfileImage() != null) {
             user.setProfileImage(request.getProfileImage());
         }
-        if (request.getRole() != null) {
-            try {
-                user.setRole(Role.valueOf(request.getRole().toUpperCase()));
-            } catch (IllegalArgumentException e) {
-                throw new RuntimeException("Invalid role: " + request.getRole());
-            }
-        }
 
         return userRepository.save(user);
     }
@@ -100,35 +86,45 @@ public class UserServiceImpl implements UserService {
         userRepository.deleteById(id);
     }
 
-    @Override
-    public User getProfile(String email) {
-        return userRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException("User not found with email: " + email));
-    }
+@Override
+public UserProfileResponse getProfile(String email) {
 
-//    @Override
-//    public User updateProfile(String email, UserUpdateRequest request) {
-//        User user = userRepository.findByEmail(email)
-//                .orElseThrow(() -> new EntityNotFoundException("User not found with email: " + email));
-//
-//        // Role-check: only TENANT or USER can update their own profile
-//        if (!(user.getRole() == Role.TENANT )) {
-//            throw new AccessDeniedException("Only TENANT or USER can update profile");
-//        }
-//
-//        // Validation
-//        if (request.getUsername() != null && !request.getUsername().isBlank()) {
-//            user.setUsername(request.getUsername());
-//        }
-//        if (request.getPhone() != null) {
-//            user.setPhone(request.getPhone());
-//        }
-//        if (request.getProfileImage() != null) {
-//            user.setProfileImage(request.getProfileImage());
-//        }
-//
-//        return userRepository.save(user);
-//    }
+    User user = userRepository.findByEmail(email)
+            .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+    // ✅ FIX: pass user ID
+    List<Rental> rentals = rentalRepository.findByTenant_Id(user.getId());
+
+    // Map rentals
+    List<RentalResponse> rentalResponses = rentals.stream().map(r -> {
+        RentalResponse res = new RentalResponse();
+        res.setId(r.getId());
+        res.setRoomNumber(r.getRoom().getRoomNumber());
+
+        // ✅ FIX: enum → string
+        res.setStatus(r.getStatus());
+
+        res.setStartDate(r.getStartDate());
+
+        // ✅ FIX: correct endDate
+        res.setEndDate(r.getEndDate());
+
+
+        return res;
+    }).toList();
+
+    // Build response
+    UserProfileResponse response = new UserProfileResponse();
+    response.setUsername(user.getUsername());
+    response.setEmail(user.getEmail());
+    response.setPhone(user.getPhone());
+    response.setProfileImage(user.getProfileImage());
+    response.setRentals(rentalResponses);
+    response.setPassword(user.getPassword());
+
+    return response;
+}
+
     @Override
     public UserRespone updateProfile(String email, UserUpdateRequest request, MultipartFile imageFile) throws IOException {
         User user = userRepository.findByEmail(email)
@@ -146,8 +142,10 @@ public class UserServiceImpl implements UserService {
         if (request.getPhone() != null) {
             user.setPhone(request.getPhone());
         }
-
-        // ✅ Upload profile image to Cloudinary
+        if(request.getPassword()!=null){
+//            user.setPassword(request.getPassword());
+            user.setPassword(passwordEncoder.encode(request.getPassword()));
+        }
         if (imageFile != null && !imageFile.isEmpty()) {
             Map uploadResult = cloudinary.uploader().upload(imageFile.getBytes(), ObjectUtils.emptyMap());
             String imageUrl = (String) uploadResult.get("url");
@@ -168,32 +166,6 @@ public class UserServiceImpl implements UserService {
                 user.getProfileImage()
         );
     }
-//    public User updateProfile(String email, UserUpdateRequest request, MultipartFile imageFile) throws IOException {
-//        User user = userRepository.findByEmail(email)
-//                .orElseThrow(() -> new EntityNotFoundException("User not found with email: " + email));
-//
-//        // Role-check: only TENANT can update their own profile
-//        if (!(user.getRole() == Role.TENANT)) {
-//            throw new AccessDeniedException("Only TENANT can update profile");
-//        }
-//
-//        // Validation
-//        if (request.getUsername() != null && !request.getUsername().isBlank()) {
-//            user.setUsername(request.getUsername());
-//        }
-//        if (request.getPhone() != null) {
-//            user.setPhone(request.getPhone());
-//        }
-//
-//        // ✅ Handle profile image upload
-//        if (imageFile != null && !imageFile.isEmpty()) {
-//            Map uploadResult = cloudinary.uploader().upload(imageFile.getBytes(), ObjectUtils.emptyMap());
-//            String imageUrl = (String) uploadResult.get("url");
-//            user.setProfileImage(imageUrl);
-//        }
-//
-//        return userRepository.save(user);
-//    }
 
     @Override
     public List<UserRespone> getAllTenants() {
@@ -211,35 +183,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-//    public User updateProfile( UserUpdateRequest request) {
-//
-//
-//        if (request.getUsername() != null && !request.getUsername().isBlank()) {
-//            user.setUsername(request.getUsername());
-//        }
-//        if (request.getPhone() != null) {
-//            user.setPhone(request.getPhone());
-//        }
-//        if (request.getProfileImage() != null) {
-//            user.setProfileImage(request.getProfileImage());
-//        }
-//        if (request.getRole() != null) {
-//            try {
-//                user.setRole(Role.valueOf(request.getRole().toUpperCase()));
-//            } catch (IllegalArgumentException e) {
-//                throw new RuntimeException("Invalid role: " + request.getRole());
-//            }
-//        }
-//
-//        return userRepository.save(user);
-//    }
-
-//    @Override
     public User resetPassword(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("User not found with id: " + id));
-
-        // ✅ Set default password
         user.setPassword(passwordEncoder.encode("AngkorLiving@123"));
 
         return userRepository.save(user);
